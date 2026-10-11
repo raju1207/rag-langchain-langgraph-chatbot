@@ -37,7 +37,7 @@ LLM_MODEL = os.getenv(
 
 EMBEDDING_MODEL = os.getenv(
     "EMBEDDING_MODEL",
-    "text-embedding-3-small"
+    "nomic-embed-text"
 )
 
 

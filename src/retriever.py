@@ -1,99 +1,60 @@
-from langchain_openai import OpenAIEmbeddings
+
+from langchain_ollama import OllamaEmbeddings
 from langchain_community.vectorstores import FAISS
 
 from src.config import (
     VECTORSTORE_DIR,
     EMBEDDING_MODEL,
     TOP_K,
-    validate_config,
 )
 
 
 def load_vectorstore():
-    """
-    Load the previously created FAISS vector store.
-    """
+    """Load the FAISS index using the same embedding model as ingestion."""
 
-    validate_config()
+    index_file = VECTORSTORE_DIR / "index.faiss"
+    metadata_file = VECTORSTORE_DIR / "index.pkl"
 
-    embeddings = OpenAIEmbeddings(
-        model=EMBEDDING_MODEL
-    )
-
-    if not VECTORSTORE_DIR.exists():
+    if not index_file.exists() or not metadata_file.exists():
         raise FileNotFoundError(
-            "FAISS vector store not found. "
-            "Run ingest.py first."
+            f"FAISS index is missing at {VECTORSTORE_DIR}. "
+            "Run 'python -m src.ingest' first."
         )
 
-    vectorstore = FAISS.load_local(
+    embeddings = OllamaEmbeddings(model=EMBEDDING_MODEL)
+
+    return FAISS.load_local(
         str(VECTORSTORE_DIR),
         embeddings,
         allow_dangerous_deserialization=True,
     )
 
-    return vectorstore
-
 
 def get_retriever():
-    """
-    Create a similarity-based retriever.
-    """
+    """Create a similarity-based retriever."""
 
     vectorstore = load_vectorstore()
 
-    retriever = vectorstore.as_retriever(
+    return vectorstore.as_retriever(
         search_type="similarity",
-        search_kwargs={
-            "k": TOP_K
-        },
+        search_kwargs={"k": TOP_K},
     )
-
-    return retriever
 
 
 def retrieve_documents(question: str):
-    """
-    Retrieve relevant document chunks for a question.
-    """
+    """Retrieve relevant document chunks for a question."""
 
-    retriever = get_retriever()
-
-    documents = retriever.invoke(
-        question
-    )
-
-    return documents
+    return get_retriever().invoke(question)
 
 
 if __name__ == "__main__":
-
-    question = input(
-        "Enter your question: "
-    )
-
-    documents = retrieve_documents(
-        question
-    )
+    question = input("Enter your question: ")
+    documents = retrieve_documents(question)
 
     print("\nRetrieved Documents:\n")
 
-    for index, document in enumerate(
-        documents,
-        start=1
-    ):
-
-        print(
-            f"--- Document {index} ---"
-        )
-
-        print(
-            document.page_content[:500]
-        )
-
-        print(
-            "Metadata:",
-            document.metadata
-        )
-
+    for index, document in enumerate(documents, start=1):
+        print(f"--- Document {index} ---")
+        print(document.page_content[:500])
+        print("Metadata:", document.metadata)
         print()
